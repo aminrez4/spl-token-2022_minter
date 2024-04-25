@@ -85,7 +85,7 @@ async function main() {
     };
     const txid = await createV1(umi, { ...accounts, ...data }).sendAndConfirm(umi);
     console.log("MetaData updated");
-    console.log("TX: ",bs58.encode(txid.signature));
+    console.log(bs58.encode(txid.signature));
   } else {
     const onChainData = {
       ...ourMetadata,

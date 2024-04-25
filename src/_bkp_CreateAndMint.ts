@@ -31,7 +31,6 @@ import base58 from "bs58";
 import dotenv from "dotenv";
 dotenv.config();
 
-// https://www.quicknode.com/guides/solana-development/spl-tokens/token-2022/transfer-fees
 // Initialize connection to local Solana node
 // CHANGE PASSING RPC FRON ENV
 const connection = new Connection("https://api.devnet.solana.com", "confirmed");
@@ -63,8 +62,8 @@ const mintLen = getMintLen(extensions);
 
 // Set the decimals, fee basis points, and maximum fee
 const decimals = 9;
-const feeBasisPoints = 100* 30; // 10%
-const maxFee = BigInt(100000 * Math.pow(10, decimals)); // 1000 tokens
+const feeBasisPoints = 1000; // 10%
+const maxFee = BigInt(1000 * Math.pow(10, decimals)); // 1000 tokens
 // aggiungere max fee transfer
 
 
@@ -140,36 +139,31 @@ async function main() {
 
 
   // Step 3 - Send Tokens from Owner to a New Account
-  console.log("Step 3 - Send Tokens to 3 New Account:");
-  for(let i=0; i < 3; i++){
-      const destinationOwner = Keypair.generate();
-      console.log("Keypair generated for the new Holder:", destinationOwner );
-      console.log(destinationOwner);
-      const destinationAccount = await createAssociatedTokenAccountIdempotent(
-        connection,
-        payer,
-        mint,
-        destinationOwner.publicKey,
-        {},
-        TOKEN_2022_PROGRAM_ID
-      );
-      const transferSig = await transferCheckedWithFee(
-        connection,
-        payer,
-        sourceAccount,
-        mint,
-        destinationAccount,
-        owner,
-        transferAmount,
-        decimals,
-        fee,
-        []
-      );
-      console.log("Tokens Transfered:", generateExplorerTxUrl(transferSig));
-    }
-
-
-  //-------------------------------- CALCULATE THE HOLDERS OF THE TOKENS AND PUT THE ADRESSES IN AN ARRAY -----------------------------------------------------
+  console.log("Step 3 - Send Tokens from to a New Account:");
+  const destinationOwner = Keypair.generate();
+  console.log("Keypair generated for the new Holder:", destinationOwner );
+  console.log(destinationOwner);
+  const destinationAccount = await createAssociatedTokenAccountIdempotent(
+    connection,
+    payer,
+    mint,
+    destinationOwner.publicKey,
+    {},
+    TOKEN_2022_PROGRAM_ID
+  );
+  const transferSig = await transferCheckedWithFee(
+    connection,
+    payer,
+    sourceAccount,
+    mint,
+    destinationAccount,
+    owner,
+    transferAmount,
+    decimals,
+    fee,
+    []
+  );
+  console.log("Tokens Transfered:", generateExplorerTxUrl(transferSig));
 
   // Step 5 - Fetch Fee Accounts
   const allAccounts = await connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
@@ -198,13 +192,8 @@ async function main() {
   
   // Step 6 - Harvest Fees where I pass a wallet where I want to withdraw the fees
   console.log("Step 6 - Harvest Fees");
-  //------------------------------------------------ WITHDRAW FEES ----------------------------------------------------------------------------------------------------
- 
- 
-  const feeVault = Keypair.generate(); // ACCOUNT WHERE I DEPOSIT THE WHITDRAWED FEES 
-  // USE LOTTERY CONTRACT
-  console.log("nuovo account creato dove deposito i token", feeVault.publicKey);
-  console.log("KEYs: ", feeVault);
+  const feeVault = Keypair.generate(); // creo nuovo wallet e lo uso per depositare le fee cambiare con account 
+  console.log("nuovo account creato dove deposito i token", feeVault);
   const feeVaultAccount = await createAssociatedTokenAccountIdempotent(
     connection,
     payer,
