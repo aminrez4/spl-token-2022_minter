@@ -27,25 +27,32 @@ import {
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountIdempotent,
 } from "@solana/spl-token";
+import base58 from "bs58";
 import dotenv from "dotenv";
 dotenv.config();
 
 // Initialize connection to local Solana node
+// CHANGE PASSING RPC FRON ENV
 const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 
-// Generate keys for payer, mint authority, and mint
-const privateKeyBytes = Buffer.from(process.env.PRIVATE_KEY, "hex");
-const payer = Keypair.fromSecretKey(privateKeyBytes);
 
-// const payer = Keypair.generate();
-// const mintAuthority = Keypair.generate();
-const mintAuthority = payer;
-const mintKeypair = Keypair.generate();
-const mint = mintKeypair.publicKey;
+//--------- DEFINE THE OWNER WALLET AND THE OTHERS WALLET INVOLVED -------------------------------------------------------------------------
+// Generate keys for payer, mint authority, and mint our PRIVATE_KEY
+const payer = Keypair.fromSecretKey(base58.decode(process.env.PRIVATE_KEY));
+const mintAuthority = payer; // THE MINT AUTHORITY
+const mintOwn = payer.publicKey;
+const mintKeypair = Keypair.generate(); // GENERATE A NEW ACCOUNT TO MINT THE TOKENS
+const mint = mintKeypair.publicKey; // account propietario della Mint Authority
 
-// Generate keys for transfer fee config authority and withdrawal authority
-const transferFeeConfigAuthority = Keypair.generate();
-const withdrawWithheldAuthority = Keypair.generate();
+const owner = payer; // THE OWNER OF THE TOKENS
+
+// Generate keys for transfer fee CONFIG AUTHORITY and WITHDRAW AUTHORITY
+const transferFeeConfigAuthority = mintOwn;   // THE WALLET CAN CHANGE THE SETTINS FOR THIS TOKEN
+const withdrawWithheldAuthority = mintOwn;  // THE WITHDRAW AUTHORITY ( WHIC WALLET CAN WITHRAW THE FEES)
+
+
+//--------- DEFINE THE EXTENSIONS --------------------------------------------------------------------------------------------------------------
+
 
 // Define the extensions to be used by the mint
 const extensions = [ExtensionType.TransferFeeConfig];
@@ -55,8 +62,10 @@ const mintLen = getMintLen(extensions);
 
 // Set the decimals, fee basis points, and maximum fee
 const decimals = 9;
-const feeBasisPoints = 100; // 1%
-const maxFee = BigInt(9 * Math.pow(10, decimals)); // 9 tokens
+const feeBasisPoints = 1000; // 10%
+const maxFee = BigInt(1000 * Math.pow(10, decimals)); // 1000 tokens
+// aggiungere max fee transfer
+
 
 // Define the amount to be minted and the amount to be transferred, accounting for decimals
 const mintAmount = BigInt(1_000_000 * Math.pow(10, decimals)); // Mint 1,000,000 tokens
@@ -72,37 +81,41 @@ function generateExplorerTxUrl(txId: string) {
 }
 
 async function main() {
-  // Step 1 - Airdrop to Payer
-  const airdropSignature = await connection.requestAirdrop(payer.publicKey, 2 * LAMPORTS_PER_SOL);
-  await connection.confirmTransaction({ signature: airdropSignature, ...(await connection.getLatestBlockhash()) });
-
-  // Step 2 - Create a New Token
+  // Step 0 - Airdrop to Payer ( FOR TEST PURPOSE ON DEVNET)
+  //  console.log("Step 0 - Airdrop to Payer - Passed!");
+  // const airdropSignature = await connection.requestAirdrop(payer.publicKey, 2 * LAMPORTS_PER_SOL);
+  // await connection.confirmTransaction({ signature: airdropSignature, ...(await connection.getLatestBlockhash()) });
+  
+  // Step 1 - Create a New Token
+  console.log("Step 1 - Create a New Token");
   const mintLamports = await connection.getMinimumBalanceForRentExemption(mintLen);
   const mintTransaction = new Transaction().add(
+    // I CREATE A NEW ACCOUNT USING THE MINT ACCOUNT CREATED ABOVE
     SystemProgram.createAccount({
       fromPubkey: payer.publicKey,
-      newAccountPubkey: mint,
+      newAccountPubkey: mint, 
       space: mintLen,
       lamports: mintLamports,
       programId: TOKEN_2022_PROGRAM_ID,
     }),
+    // I CREATE A TRANFER FEE CONFIG
     createInitializeTransferFeeConfigInstruction(
       mint,
-      transferFeeConfigAuthority.publicKey,
-      withdrawWithheldAuthority.publicKey,
+      transferFeeConfigAuthority, 
+      withdrawWithheldAuthority,
       feeBasisPoints,
       maxFee,
       TOKEN_2022_PROGRAM_ID
     ),
     createInitializeMintInstruction(mint, decimals, mintAuthority.publicKey, null, TOKEN_2022_PROGRAM_ID)
   );
-  const newTokenTx = await sendAndConfirmTransaction(connection, mintTransaction, [payer, mintKeypair], undefined);
+  const newTokenTx = await sendAndConfirmTransaction(connection, mintTransaction, [payer, mintKeypair], undefined); // SEND THE TRANSACTION 
   console.log("New Token Created:", generateExplorerTxUrl(newTokenTx));
-  console.log("Mint: ", mintKeypair);
+  console.log("Mint KeyPair: ", mintKeypair);
+  console.log("Mint wallet: ", mintKeypair.publicKey);
 
-  // Step 3 - Mint tokens to Owner
-  // const owner = Keypair.generate();
-  const owner = payer; // currently the payer is the token owner
+  // Step 2 - Mint tokens to Owner
+  console.log("Step 2 - Mint tokens to Owner");
   const sourceAccount = await createAssociatedTokenAccountIdempotent(
     connection,
     payer,
@@ -124,8 +137,12 @@ async function main() {
   );
   console.log("Tokens Minted:", generateExplorerTxUrl(mintSig));
 
-  // Step 4 - Send Tokens from Owner to a New Account
+
+  // Step 3 - Send Tokens from Owner to a New Account
+  console.log("Step 3 - Send Tokens from to a New Account:");
   const destinationOwner = Keypair.generate();
+  console.log("Keypair generated for the new Holder:", destinationOwner );
+  console.log(destinationOwner);
   const destinationAccount = await createAssociatedTokenAccountIdempotent(
     connection,
     payer,
@@ -170,9 +187,13 @@ async function main() {
     }
   }
 
-  /**
-  // Step 6 - Harvest Fees
-  const feeVault = Keypair.generate();
+  console.log("holders:", accountsToWithdrawFrom);
+
+  
+  // Step 6 - Harvest Fees where I pass a wallet where I want to withdraw the fees
+  console.log("Step 6 - Harvest Fees");
+  const feeVault = Keypair.generate(); // creo nuovo wallet e lo uso per depositare le fee cambiare con account 
+  console.log("nuovo account creato dove deposito i token", feeVault);
   const feeVaultAccount = await createAssociatedTokenAccountIdempotent(
     connection,
     payer,
@@ -192,8 +213,9 @@ async function main() {
     accountsToWithdrawFrom
   );
   console.log("Withdraw from Accounts:", generateExplorerTxUrl(withdrawSig1));
-  */
+  
 }
+
 
 // Execute the main function
 main();
