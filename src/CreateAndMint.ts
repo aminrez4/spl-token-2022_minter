@@ -40,6 +40,7 @@ const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 //--------- DEFINE THE OWNER WALLET AND THE OTHERS WALLET INVOLVED -------------------------------------------------------------------------
 // Generate keys for payer, mint authority, and mint our PRIVATE_KEY
 const payer = Keypair.fromSecretKey(base58.decode(process.env.PRIVATE_KEY));
+
 const mintAuthority = payer; // THE MINT AUTHORITY
 const mintOwn = payer.publicKey;
 const mintKeypair = Keypair.generate(); // GENERATE A NEW ACCOUNT TO MINT THE TOKENS
@@ -80,6 +81,25 @@ const fee = calcFee > maxFee ? maxFee : calcFee; // expect 9 fee
 function generateExplorerTxUrl(txId: string) {
   return `https://explorer.solana.com/tx/${txId}?cluster=devnet`;
 }
+let balanceInfoFee ;
+async function checkTokenBalance(connection, feeVault) {
+  let balanceInfo;
+  try {
+    // Ottieni il saldo del token dall'account associato
+     balanceInfo= await connection.getTokenAccountBalance(
+      feeVault
+    );
+
+   
+    console.log("Token balance in ui:", balanceInfo.value.uiAmount);
+    console.log("Token balance:", balanceInfo.value.amount);
+    balanceInfoFee = balanceInfo.value.uiAmount; 
+    return  balanceInfo.value.uiAmount; // Restituisce l'importo del saldo;
+  } catch (error) {
+    console.error("Errore nel controllo del saldo del token:", error);
+    throw error; // Rilancia l'errore per la gestione
+  }
+};
 
 async function main() {
   // Step 0 - Airdrop to Payer ( FOR TEST PURPOSE ON DEVNET)
@@ -200,11 +220,11 @@ async function main() {
   console.log("Step 6 - Harvest Fees");
   //------------------------------------------------ WITHDRAW FEES ----------------------------------------------------------------------------------------------------
  
- 
+
   const feeVault = Keypair.generate(); // ACCOUNT WHERE I DEPOSIT THE WHITDRAWED FEES 
   // USE LOTTERY CONTRACT
   console.log("nuovo account creato dove deposito i token", feeVault.publicKey);
-  console.log("KEYs: ", feeVault);
+  // console.log("Keys: ", feeVault);
   const feeVaultAccount = await createAssociatedTokenAccountIdempotent(
     connection,
     payer,
@@ -224,9 +244,52 @@ async function main() {
     accountsToWithdrawFrom
   );
   console.log("Withdraw from Accounts:", generateExplorerTxUrl(withdrawSig1));
+
+  
+  //------------------------------------------------ WITHDRAW FEES ----------------------------------------------------------------------------------------------------
+  
+  
+  // controllo quanti token sono nel wallet e li inserisco in una variabile
+  let balanceInfo = await checkTokenBalance(connection, feeVaultAccount) ;
+   const tokenToSend = 900000000000 / 1000000000;
+  const transferAmountToWithdraw = BigInt(balanceInfoFee * Math.pow(10, decimals)); // Transfer 1,000 tokens
+  console.log("trasferAmount 1_000: ",transferAmountToWithdraw);
+
+  // Calculate the fee for the transfer
+  const calcFeeToWithdraw = (transferAmountToWithdraw * BigInt(feeBasisPoints)) / BigInt(10_000); // expect 10 fee
+  const feeToWithdraw = calcFeeToWithdraw > maxFee ? maxFee : calcFee; // expect 9 fee
+
+
+/*
+  // trasferire i troken a un altro wallet -> lottery wallet C7zMLHuh7hYLZqrpwJ78SgZw4xFkRsSwEVdgtFQj4cWs
+  const lotteryWallet = Keypair.generate();
+  console.log("Keypair generated for the new Holder:", lotteryWallet );
+  console.log(lotteryWallet);
+  const destinationAccount = await createAssociatedTokenAccountIdempotent(
+    connection,
+    payer,
+    mint,
+    lotteryWallet.publicKey,
+    {},
+    TOKEN_2022_PROGRAM_ID
+  );
+  const transferSig = await transferCheckedWithFee(
+    connection,
+    payer,
+    sourceAccount,
+    mint,
+    destinationAccount,
+    owner,
+    transferAmountToWithdraw,
+    decimals,
+    fee,
+    []
+  );
+  console.log("Tokens Transfered:", generateExplorerTxUrl(transferSig));
+*/
+
   
 }
-
 
 // Execute the main function
 main();
