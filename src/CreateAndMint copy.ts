@@ -225,13 +225,12 @@ async function main() {
   //------------------------------------------------ WITHDRAW FEES ----------------------------------------------------------------------------------------------------
    // Step 6 - Harvest Fees where I pass a wallet where I want to withdraw the fees
    console.log("Step 6 - Harvest Fees");
-   const winner =accountsToWithdrawFrom[0];
   
    const destinationAccount = await getOrCreateAssociatedTokenAccount(
      connection,
      payer,
      mint,
-     winner,
+     pda_lottery,
      true,
      "confirmed",
      null,
@@ -243,7 +242,7 @@ async function main() {
     connection,
     payer,
     mint,
-    winner,
+    destinationAccount.address,
     withdrawWithheldAuthority,
     [],
     accountsToWithdrawFrom
