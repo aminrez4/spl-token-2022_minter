@@ -195,6 +195,7 @@ async function main() {
 
 
   //-------------------------------- CALCULATE THE HOLDERS OF THE TOKENS AND PUT THE ADRESSES IN AN ARRAY -----------------------------------------------------
+//-------------------------------- CALCULATE THE TOTAL FEE INSIDE ALL THE WALLETS -----------------------------------------------------
 
   // Step 5 - Fetch Fee Accounts
   const allAccounts = await connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
@@ -210,21 +211,22 @@ async function main() {
   });
 
   const accountsToWithdrawFrom: PublicKey[] = [];
+  let totalFeesAccounts= 0;
   for (const accountInfo of allAccounts) {
     const account = unpackAccount(accountInfo.pubkey, accountInfo.account, TOKEN_2022_PROGRAM_ID);
-    const transferFeeAmount = getTransferFeeAmount(account);
+    const transferFeeAmount  = getTransferFeeAmount(account);
     if (transferFeeAmount !== null && transferFeeAmount.withheldAmount > BigInt(0)) {
+      totalFeesAccounts += (Number(transferFeeAmount.withheldAmount)/ Math.pow(10, decimals)).valueOf();
       accountsToWithdrawFrom.push(accountInfo.pubkey);
     }
   }
-
   console.log("holders:", accountsToWithdrawFrom);
-
+  console.log("total fee:", totalFeesAccounts);
   
 
   //------------------------------------------------ WITHDRAW FEES ----------------------------------------------------------------------------------------------------
    // Step 6 - Harvest Fees where I pass a wallet where I want to withdraw the fees
-   console.log("Step 6 - Harvest Fees");
+  /* console.log("Step 6 - Harvest Fees");
    const winner =accountsToWithdrawFrom[0];
   
    const destinationAccount = await getOrCreateAssociatedTokenAccount(
@@ -252,6 +254,7 @@ async function main() {
   console.log("Withdraw from Accounts:", generateExplorerTxUrl(withdrawSig1));
   
   console.log("Associed account: ", destinationAccount.address)
+  */
 
  // --------------------------------- CHANGE THE OWNERSHIP OF THE ASSOCIATED WALLET TO THE PROGRAM ID ------------------------------------------------------------
 
